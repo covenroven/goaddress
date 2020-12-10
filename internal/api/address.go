@@ -3,7 +3,9 @@ package api
 import (
     "net/http"
     "log"
-    // "database/sql"
+    "fmt"
+    "database/sql"
+    "encoding/json"
 	"github.com/go-chi/chi"
     "github.com/covenroven/goaddress/internal/database"
     "github.com/covenroven/goaddress/internal/model"
@@ -16,8 +18,19 @@ func IndexAddresses(w http.ResponseWriter, r *http.Request) {
     }
     defer db.Close()
 
+    querystr := r.URL.Query()
+    fmt.Println(querystr.Get("userid"))
+
     var addresses []model.Model
-    rows, err := db.Query("SELECT id, street, city, province, postal_code, country FROM addresses")
+    var rows *sql.Rows
+    if querystr.Get("user_id") != "" {
+        rows, err = db.Query(
+            "SELECT id, street, city, province, postal_code, country, user_id FROM addresses WHERE user_id = $1",
+            querystr.Get("user_id"),
+        )
+    } else {
+        rows, err = db.Query("SELECT id, street, city, province, postal_code, country, user_id FROM addresses")
+    }
     if err != nil {
         panic(err)
     }
@@ -31,6 +44,7 @@ func IndexAddresses(w http.ResponseWriter, r *http.Request) {
             &address.Province,
             &address.PostalCode,
             &address.Country,
+            &address.UserId,
         )
 
         addresses = append(addresses, address)
@@ -46,19 +60,133 @@ func IndexAddresses(w http.ResponseWriter, r *http.Request) {
 }
 
 func StoreAddress(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("post user"))
+    db, _ := database.Connect()
+    defer db.Close()
+
+    if r.Body == nil {
+        responseWithJson(w, model.Response{
+            Status: 422,
+            Message: "No parameter provided",
+            Data: []model.Model{},
+        })
+        return;
+    }
+
+    var param model.Address
+    err := json.NewDecoder(r.Body).Decode(&param)
+    if err != nil {
+        responseWithJson(w, model.Response{
+            Status: 400,
+            Message: err.Error(),
+            Data: []model.Model{},
+        })
+        return;
+    }
+
+    var address model.Address
+    err = db.QueryRow(
+        `INSERT INTO addresses(street, city, province, postal_code, country, user_id)
+        VALUES($1, $2, $3, $4, $5, $6)
+        RETURNING id, street, city, province, postal_code, country, user_id`,
+        param.Street,
+        param.City,
+        param.Province,
+        param.PostalCode,
+        param.Country,
+        param.UserId,
+    ).Scan(
+        &address.Id,
+        &address.Street,
+        &address.City,
+        &address.Province,
+        &address.PostalCode,
+        &address.Country,
+        &address.UserId,
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(address)
+    responseWithJson(w, model.Response{
+        Status: 201,
+        Message: "Created",
+        Data: []model.Model{address},
+    })
+}
+
+type BatchStoreAddressParam struct {
+    UserId int
+    Addresses []model.Address
+}
+
+func BatchStoreAddresses(w http.ResponseWriter, r *http.Request) {
+    db, _ := database.Connect()
+    defer db.Close()
+
+    if r.Body == nil {
+        responseWithJson(w, model.Response{
+            Status: 422,
+            Message: "No parameter provided",
+            Data: []model.Model{},
+        })
+        return;
+    }
+
+    var param BatchStoreAddressParam
+    err := json.NewDecoder(r.Body).Decode(&param)
+    if err != nil {
+        responseWithJson(w, model.Response{
+            Status: 400,
+            Message: err.Error(),
+            Data: []model.Model{},
+        })
+        return;
+    }
+
+    stmt, _ := db.Prepare(
+        `INSERT INTO addresses(street, city, province, postal_code, country, user_id)
+        VALUES($1, $2, $3, $4, $5, $6)`,
+    )
+    defer stmt.Close()
+
+    for _, address := range param.Addresses {
+        if _, err := stmt.Exec(
+            address.Street,
+            address.City,
+            address.Province,
+            address.PostalCode,
+            address.Country,
+            param.UserId,
+        ); err != nil {
+            log.Fatal(err)
+        }
+    }
+
+    responseWithJson(w, model.Response{
+        Status: 201,
+        Message: "Created",
+        Data: []model.Model{},
+    })
 }
 
 func ShowAddress(w http.ResponseWriter, r *http.Request) {
     db, _ := database.Connect()
     defer db.Close()
 
-    userID := chi.URLParam(r, "userID")
+    addressID := chi.URLParam(r, "addressID")
 
-    row := db.QueryRow("SELECT * FROM users WHERE id = $1", userID)
+    row := db.QueryRow("SELECT id, street, city, province, postal_code, country, user_id FROM addresses WHERE id = $1", addressID)
 
-    var user model.User
-    err := row.Scan(&user.Id, &user.Name, &user.Email)
+    var address model.Address
+    err := row.Scan(
+        &address.Id,
+        &address.Street,
+        &address.City,
+        &address.Province,
+        &address.PostalCode,
+        &address.Country,
+        &address.UserId,
+    )
     if err != nil {
         responseWithJson(w, model.Response{
             Status: 404,
@@ -71,7 +199,6 @@ func ShowAddress(w http.ResponseWriter, r *http.Request) {
     responseWithJson(w, model.Response{
         Status: 200,
         Message: "ok",
-        Data: []model.Model{user},
+        Data: []model.Model{address},
     })
 }
-

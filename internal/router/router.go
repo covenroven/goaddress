@@ -16,6 +16,7 @@ func Init() (chi.Router, error) {
 	r.Route("/addresses", func(r chi.Router) {
 	    r.Get("/", api.IndexAddresses);
 	    r.Post("/", api.StoreAddress);
+	    r.Post("/batch", api.BatchStoreAddresses);
 	    r.Get("/{addressID}", api.ShowAddress);
 	    // r.Put("/{userID}", api.ShowUser);
 	    // r.Delete("/{userID}", api.ShowUser);

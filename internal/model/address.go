@@ -11,6 +11,7 @@ type Address struct {
     Province string `json: "province"`
     PostalCode string `db: "postal_code", json: "postal_code"`
     Country string `json: "country"`
+    UserId int `json: "user_id"`
 }
 
 type User struct {

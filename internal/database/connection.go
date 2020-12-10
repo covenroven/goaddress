@@ -3,6 +3,7 @@ package database
 import (
     "database/sql"
     "strings"
+    "os"
     _ "github.com/lib/pq"
 )
 
@@ -19,7 +20,15 @@ func getDsn() string {
     var s strings.Builder
 
     s.WriteString("postgres://")
-    s.WriteString("postgres:pass@localhost/goaddress")
+    s.WriteString(os.Getenv("DB_USERNAME"))
+    s.WriteString(":")
+    s.WriteString(os.Getenv("DB_PASSWORD"))
+    s.WriteString("@")
+    s.WriteString(os.Getenv("DB_HOST"))
+    s.WriteString(":")
+    s.WriteString(os.Getenv("DB_PORT"))
+    s.WriteString("/")
+    s.WriteString(os.Getenv("DB_DATABASE"))
 
     return s.String()
 }
