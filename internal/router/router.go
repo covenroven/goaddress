@@ -18,8 +18,8 @@ func Init() (chi.Router, error) {
 	    r.Post("/", api.StoreAddress);
 	    r.Post("/batch", api.BatchStoreAddresses);
 	    r.Get("/{addressID}", api.ShowAddress);
-	    // r.Put("/{userID}", api.ShowUser);
-	    // r.Delete("/{userID}", api.ShowUser);
+	    r.Put("/{addressID}", api.UpdateAddress);
+	    r.Delete("/{addressID}", api.DeleteAddress);
 	})
 
 	return r, nil

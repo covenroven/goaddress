@@ -202,3 +202,93 @@ func ShowAddress(w http.ResponseWriter, r *http.Request) {
         Data: []model.Model{address},
     })
 }
+
+func UpdateAddress(w http.ResponseWriter, r *http.Request) {
+    db, _ := database.Connect()
+    defer db.Close()
+
+    if r.Body == nil {
+        responseWithJson(w, model.Response{
+            Status: 422,
+            Message: "No parameter provided",
+            Data: []model.Model{},
+        })
+    }
+
+    addressID := chi.URLParam(r, "addressID")
+
+    row := db.QueryRow("SELECT id FROM addresses WHERE id = $1", addressID)
+
+    var aid int
+    err := row.Scan(&aid)
+    if err != nil {
+        responseWithJson(w, model.Response{
+            Status: 404,
+            Message: "Not found",
+            Data: []model.Model{},
+        })
+        return
+    }
+
+    var param model.Address
+    err = json.NewDecoder(r.Body).Decode(&param)
+    if err != nil {
+        responseWithJson(w, model.Response{
+            Status: 400,
+            Message: err.Error(),
+            Data: []model.Model{},
+        })
+    }
+
+    _, err = db.Exec(
+        "UPDATE addresses SET street=$1, city=$2, province=$3, postal_code=$4, country=$5, user_id=$6 WHERE id = $7",
+        param.Street,
+        param.City,
+        param.Province,
+        param.PostalCode,
+        param.Country,
+        param.UserId,
+        aid,
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    param.Id = aid
+    responseWithJson(w, model.Response{
+        Status: 200,
+        Message: "Updated",
+        Data: []model.Model{param},
+    })
+}
+
+func DeleteAddress(w http.ResponseWriter, r *http.Request) {
+    db, _ := database.Connect()
+    defer db.Close()
+
+    if r.Body == nil {
+        responseWithJson(w, model.Response{
+            Status: 422,
+            Message: "No parameter provided",
+            Data: []model.Model{},
+        })
+    }
+
+    addressID := chi.URLParam(r, "addressID")
+
+    _, err := db.Exec("DELETE FROM addresses WHERE id = $1", addressID)
+
+    if err != nil {
+        log.Fatal(err)
+        responseWithJson(w, model.Response{
+            Status: 500,
+            Message: "Something went wrong",
+            Data: []model.Model{},
+        })
+        return
+    }
+
+    responseWithJson(w, model.Response{
+        Status: 204,
+        Message: "Ok",
+    })
+}
